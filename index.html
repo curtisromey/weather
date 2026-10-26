@@ -127,6 +127,10 @@ table.models{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nu
 .nl:first-child{border-top:0;padding-top:0}
 .nl b{display:block}
 .logform{display:grid;gap:8px;max-width:640px}
+.namerow{display:flex;flex-wrap:wrap;gap:8px}
+.namerow input{flex:1 1 220px}
+.namerow select{flex:0 1 auto;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}
+.logentry .kind{color:var(--muted);font-weight:400;font-size:.88rem}
 .logform input,.logform textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;width:100%;resize:vertical}
 .logbtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 #loglist{margin-top:14px}
@@ -325,7 +329,10 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
       <h2>Storm log</h2>
       <p class="sub">Your own record of the weather you’ve watched.  Each entry also saves the pressure, wind and conditions for the place you’re viewing.</p>
       <div class="logform">
-        <input id="logname" type="text" placeholder="Storm name, if it has one" aria-label="Storm name">
+        <div class="namerow">
+          <input id="logname" type="text" placeholder="Storm name, if it has one" aria-label="Storm name">
+          <select id="lognamepick" aria-label="Pick from this season’s storm names"><option value="">Pick a name</option></select>
+        </div>
         <textarea id="lognotes" rows="3" placeholder="What happened outside?" aria-label="Notes"></textarea>
         <div class="logbtns">
           <button class="btn" id="logadd" type="button">Save entry</button>
@@ -705,38 +712,65 @@ function bearingFrom(a,b,c,d){
   const x=Math.cos(toR(a))*Math.sin(toR(c))-Math.sin(toR(a))*Math.cos(toR(c))*Math.cos(toR(d-b));
   return (Math.atan2(y,x)*180/Math.PI+360)%360;
 }
+const NHC_GIS="https://mapservices.weather.noaa.gov/tropical/rest/services/tropical/NHC_tropical_weather_summary/MapServer/5/query?";
+const titleCase=t=>String(t||"").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+async function stormsFromGIS(){
+  const j=await getJSON(NHC_GIS+qs({where:"1=1",outFields:"stormname,stormtype,tcdvlp,basin,maxwind,mslp,tcdir,lat,lon,tau",returnGeometry:"false",f:"json"}));
+  if(j.error) throw new Error("gis error");
+  const best={};
+  (j.features||[]).forEach(f=>{
+    const a=f.attributes||{}; const key=(a.basin||"")+"|"+(a.stormname||"");
+    const tau=a.tau==null?999:Number(a.tau);
+    if(!best[key]||tau<best[key].tau) best[key]={tau,a};
+  });
+  return Object.values(best).map(({a})=>({
+    title:((a.tcdvlp||STORM_TYPES[a.stormtype]||a.stormtype||"System")+" "+titleCase(a.stormname)).trim(),
+    basin:a.basin||"",
+    lat:a.lat!=null?Number(a.lat):null, lon:a.lon!=null?Number(a.lon):null,
+    kt:a.maxwind!=null?Number(a.maxwind):null, mb:a.mslp||null,
+    dir:a.tcdir!=null?Number(a.tcdir):null
+  }));
+}
+async function stormsFromJSON(){
+  const j=await getJSON("https://www.nhc.noaa.gov/CurrentStorms.json");
+  return (j.activeStorms||[]).map(x=>({
+    title:((STORM_TYPES[x.classification]||x.classification||"System")+" "+(x.name||"")).trim(),
+    basin:"",
+    lat:coord(x.latitudeNumeric,x.latitude), lon:coord(x.longitudeNumeric,x.longitude),
+    kt:(x.intensity!=null&&x.intensity!==""&&!isNaN(Number(x.intensity)))?Number(x.intensity):null,
+    mb:x.pressure||null,
+    dir:(x.movementDir!=null&&!isNaN(Number(x.movementDir)))?Number(x.movementDir):null
+  }));
+}
 async function loadStorms(){
   const box=$("flstorms"); box.innerHTML='<p class="muted">Checking the National Hurricane Center</p>';
-  try{
-    const j=await getJSON("https://www.nhc.noaa.gov/CurrentStorms.json");
-    const list=(j.activeStorms||[]).map(x=>{
-      const lat=coord(x.latitudeNumeric,x.latitude), lon=coord(x.longitudeNumeric,x.longitude);
-      const dist=(lat!=null&&lon!=null)?distMiles(BARTOW.lat,BARTOW.lon,lat,lon):null;
-      return {x,lat,lon,dist};
-    }).sort((a,b)=>(a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist));
-    box.innerHTML="";
-    if(!list.length){
-      const p=document.createElement("p");
-      p.textContent="Nothing active right now.  The Atlantic season runs through November 30.";
-      box.appendChild(p); return;
-    }
-    list.forEach(({x,lat,lon,dist})=>{
-      const el=document.createElement("div"); el.className="storm"+(dist!=null&&dist<400?" near":"");
-      const b=document.createElement("b");
-      b.textContent=((STORM_TYPES[x.classification]||x.classification||"System")+" "+(x.name||"")).trim();
-      const where=document.createElement("div");
-      if(dist!=null) where.textContent=`About ${Math.round(dist)} miles ${compass(bearingFrom(BARTOW.lat,BARTOW.lon,lat,lon))} of Bartow`;
-      const p=document.createElement("div"); p.className="muted";
-      const bits=[]; const kt=Number(x.intensity);
-      if(x.intensity!=null&&x.intensity!==""&&!isNaN(kt)) bits.push(`Winds ${kt} kt (about ${Math.round(kt*1.15078)} mph)`);
-      if(x.pressure) bits.push(`${x.pressure} mb`);
-      if(x.movementDir!=null&&!isNaN(Number(x.movementDir))) bits.push(`moving ${compass(Number(x.movementDir))}`);
-      p.textContent=bits.join(", ");
-      el.append(b,where,p); box.appendChild(el);
-    });
-  }catch(e){
-    box.innerHTML='<p class="muted">The National Hurricane Center feed did not load here.  Use the link below for the latest.</p>';
+  let raw;
+  try{ raw=await stormsFromGIS(); }
+  catch(e){
+    try{ raw=await stormsFromJSON(); }
+    catch(e2){ box.innerHTML='<p class="muted">The National Hurricane Center feed did not load here.  Use the link below for the latest.</p>'; return; }
   }
+  const list=raw.map(x=>Object.assign(x,{dist:(x.lat!=null&&x.lon!=null&&!isNaN(x.lat)&&!isNaN(x.lon))?distMiles(BARTOW.lat,BARTOW.lon,x.lat,x.lon):null}))
+    .sort((a,b)=>(a.dist==null?1e9:a.dist)-(b.dist==null?1e9:b.dist));
+  box.innerHTML="";
+  if(!list.length){
+    const p=document.createElement("p");
+    p.textContent="Nothing active right now.  The Atlantic season runs through November 30.";
+    box.appendChild(p); return;
+  }
+  list.forEach(x=>{
+    const el=document.createElement("div"); el.className="storm"+(x.dist!=null&&x.dist<400?" near":"");
+    const b=document.createElement("b"); b.textContent=x.title;
+    const where=document.createElement("div");
+    if(x.dist!=null) where.textContent=`About ${Math.round(x.dist)} miles ${compass(bearingFrom(BARTOW.lat,BARTOW.lon,x.lat,x.lon))} of Bartow${x.basin?", "+x.basin:""}`;
+    const p=document.createElement("div"); p.className="muted";
+    const bits=[];
+    if(x.kt!=null&&!isNaN(x.kt)) bits.push(`Winds ${Math.round(x.kt)} kt (about ${Math.round(x.kt*1.15078)} mph)`);
+    if(x.mb) bits.push(`${x.mb} mb`);
+    if(x.dir!=null&&!isNaN(x.dir)) bits.push(`moving ${compass(x.dir)}`);
+    p.textContent=bits.join(", ");
+    el.append(b,where,p); box.appendChild(el);
+  });
 }
 function loadOutlook(){
   const box=$("flout"); box.innerHTML="";
@@ -950,6 +984,31 @@ async function renderNormal(pl,d,token){
 }
 
 /* ---------- storm log ---------- */
+// Storm name lists.  Update these each season:
+// UK list (Met Office, Met Éireann, KNMI) changes every September.
+// Atlantic list rotates every June (6 lists, reused every 6 years).
+// US winter storm names come from The Weather Channel each October.
+const STORM_NAMES=[
+  {kind:"UK storm",label:"UK storms 2026/27",names:["Austen","Boelo","Chloe","Dano","Evelyn","Finn","Gwendolyn","Heather","Ivy","Jade","Kilian","Laoise","Miriam","Nicola","Olaf","Phelim","Ruban","Shaun","Theo","Vesna","Wende"]},
+  {kind:"Atlantic hurricane season",label:"Atlantic hurricanes 2026",names:["Arthur","Bertha","Cristobal","Dolly","Edouard","Fay","Gonzalo","Hanna","Isaias","Josephine","Kyle","Leah","Marco","Nana","Omar","Paulette","Rene","Sally","Teddy","Vicky","Wilfred"]},
+  {kind:"US winter storm",label:"US winter storms 2026/27",names:["Arabella","Brooke","Cedric","Demitri","Elbert","Fletch","Graham","Hadley","Ivory","Jamal","Kat","Langston","Minerva","Nolan","Oakley","Peyton","Rashaad","Seth","Tito","Wilson","Yvette"]}
+];
+let pickedKind="";
+(function(){
+  const sel=$("lognamepick");
+  STORM_NAMES.forEach((g,gi)=>{
+    const og=document.createElement("optgroup"); og.label=g.label;
+    g.names.forEach(n=>{const o=document.createElement("option"); o.value=gi+"|"+n; o.textContent=n; og.appendChild(o);});
+    sel.appendChild(og);
+  });
+  sel.addEventListener("change",()=>{
+    if(!sel.value) return;
+    const [gi,n]=sel.value.split("|");
+    $("logname").value=n; pickedKind=STORM_NAMES[+gi].kind;
+    sel.value="";
+  });
+  $("logname").addEventListener("input",()=>{pickedKind="";});
+})();
 const LOGKEY="wxboard.log";
 let lastSnap=null;
 function getLog(){try{return JSON.parse(localStorage.getItem(LOGKEY))||[];}catch(e){return [];}}
@@ -957,7 +1016,7 @@ function setLog(l){try{localStorage.setItem(LOGKEY,JSON.stringify(l));return tru
 function addLog(){
   const name=$("logname").value.trim(), notes=$("lognotes").value.trim(), msg=$("logmsg");
   if(!name&&!notes){msg.textContent="Add a storm name or a note first."; return;}
-  const e={id:Date.now(),when:new Date().toISOString(),name,notes};
+  const e={id:Date.now(),when:new Date().toISOString(),name,notes,kind:name?pickedKind:""};
   if(lastSnap){
     const c=lastSnap.d.current, h=hourIndex(lastSnap.d), P=lastSnap.d.hourly.pressure_msl;
     Object.assign(e,{
@@ -970,7 +1029,7 @@ function addLog(){
   }
   const l=getLog(); l.unshift(e);
   if(!setLog(l)){msg.textContent="This browser would not save the entry.  Storage may be full or turned off."; return;}
-  $("logname").value=""; $("lognotes").value="";
+  $("logname").value=""; $("lognotes").value=""; pickedKind="";
   msg.textContent="Saved."; renderLog();
 }
 function renderLog(){
@@ -978,7 +1037,8 @@ function renderLog(){
   if(!l.length){const p=document.createElement("p"); p.className="muted"; p.textContent="No entries yet.  Next time a storm rolls through, write down what you saw."; box.appendChild(p); return;}
   l.forEach(e=>{
     const el=document.createElement("div"); el.className="logentry";
-    const b=document.createElement("b"); b.textContent=e.name||"Weather note";
+    const b=document.createElement("b"); b.textContent=e.name?(e.kind?"Storm "+e.name:e.name):"Weather note";
+    if(e.kind){const k=document.createElement("span"); k.className="kind"; k.textContent="  "+e.kind; b.appendChild(k);}
     const w=document.createElement("div"); w.className="when";
     w.textContent=new Date(e.when).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+(e.place?", "+e.place:"");
     el.append(b,w);
@@ -999,8 +1059,8 @@ function downloadLog(){
   const l=getLog(), msg=$("logmsg");
   if(!l.length){msg.textContent="Nothing to download yet."; return;}
   const esc=v=>{v=v==null?"":String(v); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-  const head=["date","place","storm","conditions","temp_C","pressure_hPa","pressure_tendency","wind_mph","gust_mph","notes"];
-  const rows=l.map(e=>[e.when,e.place,e.name,e.cond,e.tempC==null?"":e.tempC.toFixed(1),e.pressHpa==null?"":Math.round(e.pressHpa),e.tend,e.windMph==null?"":Math.round(e.windMph),e.gustMph==null?"":Math.round(e.gustMph),e.notes].map(esc).join(","));
+  const head=["date","place","storm","storm_list","conditions","temp_C","pressure_hPa","pressure_tendency","wind_mph","gust_mph","notes"];
+  const rows=l.map(e=>[e.when,e.place,e.name,e.kind||"",e.cond,e.tempC==null?"":e.tempC.toFixed(1),e.pressHpa==null?"":Math.round(e.pressHpa),e.tend,e.windMph==null?"":Math.round(e.windMph),e.gustMph==null?"":Math.round(e.gustMph),e.notes].map(esc).join(","));
   const blob=new Blob([[head.join(",")].concat(rows).join("\r\n")],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="storm-log.csv";
   document.body.appendChild(a); a.click(); a.remove();
