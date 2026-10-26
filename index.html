@@ -135,6 +135,21 @@ table.models{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nu
 .logentry .snap{font-size:.92rem;margin-top:2px}
 .logentry .notes{margin:6px 0 4px;white-space:pre-wrap}
 .logentry .del{font-size:.8rem;padding:3px 10px}
+.tabs{display:flex;gap:8px;margin:14px 0 2px}
+.tab{flex:1;max-width:260px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;text-align:left;font-family:var(--display);font-weight:600;font-size:1.25rem;line-height:1.1}
+.tab small{display:block;font-family:var(--font);font-weight:400;font-size:.8rem;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab[aria-selected="true"] small{color:var(--bg);opacity:.75}
+.explain{margin-top:12px;border-top:1px solid var(--line);padding-top:8px;font-size:.92rem}
+.explain summary{cursor:pointer;color:var(--rain);font-weight:500}
+.explain div{margin-top:6px;max-width:68ch}
+.explain p{margin:0 0 8px}
+.aurgrid{display:grid;gap:16px}
+@media (min-width:760px){.aurgrid{grid-template-columns:1fr 1fr}}
+#aurnow p{margin:0 0 8px}
+.kpbig{font-family:var(--display);font-weight:700;font-size:3rem;line-height:1}
+.awuk{background:#fff;border-radius:10px;border:1px solid var(--line);overflow:hidden;max-width:552px}
+.awuk iframe{display:block;width:100%;height:480px;border:0}
 footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
 </style>
 </head>
@@ -143,19 +158,13 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
   <div class="top">
     <h1 class="brand">Weather board</h1>
     <span class="stamp" id="stamp"></span>
-    <button class="btn" id="units" type="button"></button>
+    <div class="seg" role="group" aria-label="Units">
+      <button type="button" class="segb" data-units="uk" aria-pressed="false">°C</button>
+      <button type="button" class="segb" data-units="us" aria-pressed="false">°F</button>
+    </div>
     <button class="btn" id="refresh" type="button">Refresh</button>
   </div>
-  <nav class="places" id="places" aria-label="Places"></nav>
-  <section class="editor" id="editor" hidden>
-    <div class="searchrow">
-      <input id="q" type="search" placeholder="Town or city" aria-label="Search for a place" autocomplete="off">
-      <button class="btn" id="go" type="button">Search</button>
-    </div>
-    <ul class="list" id="results"></ul>
-    <h3>Your places</h3>
-    <ul class="list" id="mine"></ul>
-  </section>
+  <div class="tabs" id="places" role="tablist" aria-label="Places"></div>
 
   <div class="grid">
     <section class="panel span2">
@@ -172,6 +181,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
           <p class="tend" id="tend"></p>
         </div>
       </div>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>The barometer</b> shows air pressure, the weight of the air pressing down on you.  Higher pressure, above about 1020 hPa or 30.1 inHg, usually means settled, dry weather.  Lower pressure, below about 1000 hPa or 29.5 inHg, usually means cloud, wind and rain.</p><p><b>hPa and millibars are the same unit.</b>  The Met Office uses them.  US forecasters mostly use inches of mercury (inHg).  1013 hPa equals 29.92 inHg.</p><p><b>The trend matters more than the number.</b>  The dashed needle is where pressure was 3 hours ago.  “Falling quickly” or “very rapidly” often means a storm is arriving within hours.  The words on the dial are old barometer tradition, a rough guide rather than a forecast.</p></div></details>
     </section>
 
     <section class="panel span2">
@@ -180,7 +190,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
       <div class="segs">
         <div class="seg" role="group" aria-label="Map area">
           <button type="button" class="segb" data-area="place" aria-pressed="true">Here</button>
-          <button type="button" class="segb" data-area="fl" aria-pressed="false">Florida and the Gulf</button>
+          <button type="button" class="segb" data-area="tropics" aria-pressed="false">Atlantic and Gulf</button>
         </div>
         <div class="seg" role="group" aria-label="Map layer">
           <button type="button" class="segb" data-layer="radar" aria-pressed="true">Radar</button>
@@ -191,6 +201,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
       </div>
       <div class="mapbox"><iframe id="map" title="Weather map from Windy" loading="lazy"></iframe></div>
       <p class="links"><a href="https://www.windy.com/" target="_blank" rel="noopener">Open Windy full screen</a></p>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>Radar</b> shows rain and snow falling right now, detected by ground stations.  Blues and greens are light, yellows and reds are heavy.</p><p><b>Rain forecast</b> is a computer model’s prediction, so use the time slider at the bottom to scroll ahead.  <b>Wind</b> shows speed and direction as moving lines.  <b>Satellite</b> shows clouds from space, which is the best way to watch a hurricane’s shape and eye.</p><p>“Atlantic and Gulf” zooms out to hurricane-watching range.</p></div></details>
     </section>
 
     <section class="panel">
@@ -199,48 +210,56 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
       <p class="rainline" id="rainline"></p>
       <div class="strip" id="strip"></div>
       <div class="striplabels" id="striplabels"></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>Each bar is a 15-minute block.  Taller means heavier.  Grey means dry.</p><p>For scale, over an hour: under 1 mm (0.04 in) is drizzle or a light shower, 1 to 4 mm (0.04 to 0.16 in) is moderate rain, and over 4 mm (0.16 in) is heavy.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Next 24 hours</h2>
       <p class="sub">Temperature and chance of rain each hour</p>
       <div class="hours" id="hours"></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>The blue percentage is the chance that <i>any</i> measurable rain falls at this exact spot during that hour.  It says nothing about how much.  100% can mean a day of drizzle.  Check the rain chart for amounts.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Rain, next 48 hours</h2>
       <p class="sub">Bars show how much will fall, the line shows the chance of any</p>
       <div class="chartbox"><canvas id="cRain"></canvas></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>Bars are how much rain is expected each hour, measured on the left scale.  The line is the chance of any rain, on the right scale.</p><p>A high line with tiny bars means likely but light, think drizzle.  A tall bar is a proper downpour.  Over 4 mm (0.16 in) in an hour is heavy rain.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Wind and gusts, next 48 hours</h2>
       <p class="sub">Miles per hour</p>
       <div class="chartbox"><canvas id="cWind"></canvas></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>Wind</b> is the steady average speed.  <b>Gusts</b> are the short bursts, and they do the damage.</p><p>As a rough guide for gusts: around 40 mph makes walking awkward and knocks bins over.  50 to 60 mph can bring down branches and disrupt travel.  Above 70 mph is damaging.  On the coast, everything is a notch worse.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Pressure, last 24 and next 48 hours</h2>
       <p class="sub">Solid is what happened, dashed is the forecast.  A fast fall usually means wind and rain on the way.</p>
       <div class="chartbox"><canvas id="cPress"></canvas></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>This is the barometer reading over time.  Low points are storms passing through.  Rises afterwards usually mean clearing skies and often a shift in the wind.</p><p>Watch the slope.  A steep drop means a deepening storm.  When pressure falls about 24 hPa (0.71 inHg) or more in 24 hours, forecasters call it a “weather bomb,” or explosive cyclogenesis.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Is this normal?</h2>
       <p class="sub">Compared with 1991 to 2020 at this time of year</p>
       <div id="normal"></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>This compares today with the 30-year average from 1991 to 2020, using days within a week either side of today’s date.  That 30-year window is the standard “normal” that weather services use.</p><p>“Warmer than 99% of days” means only about 1 in 100 days at this time of year was warmer.  That is genuinely unusual.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Do the models agree?</h2>
       <p class="sub">Rain totals for the next 4 days from separate forecast models</p>
       <div id="models"></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>Forecasts come from huge computer simulations called models, and different countries run their own.  <b>Met Office</b> is the UK’s, <b>NOAA GFS</b> is the US model, and <b>ECMWF</b> is the European Centre’s, widely regarded as one of the most accurate globally.</p><p>When they <b>agree</b>, you can trust the forecast more.  When they <b>split</b>, the weather is genuinely uncertain, so expect the forecast to change and check back.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>7 days</h2>
       <p class="sub">High and low, chance of rain, total rain, strongest gust</p>
       <div id="days"></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p>Each day shows the high and low, the highest hourly chance of rain, the expected total rain, and the strongest gust.  Days further out are less reliable, especially past day 4 or 5.</p></div></details>
     </section>
 
     <section class="panel">
@@ -249,12 +268,30 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
       <p id="seanow"></p>
       <div class="chartbox"><canvas id="cSea"></canvas></div>
       <p class="links" id="tidelink"></p>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>Wave height</b> here means significant wave height, roughly the average of the biggest third of waves.  Individual waves can be nearly twice that.</p><p><b>Period</b> is the seconds between waves.  Longer periods, over 10 seconds, carry more power and come from distant storms.  <b>Swell</b> is that long-travelled energy, while wind waves are whipped up locally.</p><p>The high and low water times are a model estimate.  Use the official link for real tide times.</p></div></details>
     </section>
 
     <section class="panel">
       <h2>Light</h2>
       <p class="sub">Sunrise, sunset and golden hour, with a rough read on the clouds</p>
       <div id="light"></div>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>Golden hour</b> is when the sun is low, under 6 degrees above the horizon, giving warm, soft light that is good for photos.  In winter at Barrow’s latitude the sun stays low all day, so golden hour stretches out.</p><p>The cloud read is a rough guide.  High and mid-level cloud tends to catch color at sunrise and sunset.  Thick low cloud blocks it.</p></div></details>
+    </section>
+
+    <section class="panel span2" id="aurorapanel" hidden>
+      <h2>Aurora watch</h2>
+      <p class="sub">Northern lights chances for Barrow tonight</p>
+      <div class="aurgrid">
+        <div>
+          <div id="aurnow"></div>
+          <div class="chartbox"><canvas id="cKp"></canvas></div>
+        </div>
+        <div class="awuk">
+          <iframe id="awuk" title="AuroraWatch UK status and activity" scrolling="no" loading="lazy"></iframe>
+        </div>
+      </div>
+      <p class="links"><a href="https://aurorawatch.lancs.ac.uk/" target="_blank" rel="noopener">AuroraWatch UK</a> <a href="https://www.swpc.noaa.gov/products/aurora-30-minute-forecast" target="_blank" rel="noopener">NOAA aurora forecast</a></p>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>Kp</b> is a 0 to 9 scale of how disturbed Earth’s magnetic field is, which drives the aurora.  As a rough rule for Barrow: Kp 5 can bring a glow low on the northern horizon, Kp 6 to 7 can put it overhead, and 4 or under usually needs a camera to catch anything.</p><p><b>AuroraWatch UK</b> is run by Lancaster University using UK magnetometers, so it is the better guide for here.  Green means nothing much.  Yellow means a camera might catch something in northern England.  Amber means it may well be visible by eye in northern England.  Red means likely visible across the UK.</p><p>You also need darkness and clear skies.  Look north, away from streetlights, and try your phone’s night mode, which sees more than your eyes do.</p></div></details>
     </section>
 
     <section class="panel span2">
@@ -263,29 +300,25 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
     </section>
 
     <section class="panel span2 fl">
-      <h2>Florida and the Gulf</h2>
-      <p class="sub">Bartow and Central Florida, plus anything spinning in the Atlantic, Caribbean or Gulf of Mexico.  Always in °F and inches.</p>
+      <h2>Storm tracker</h2>
+      <p class="sub">Active Atlantic and Eastern Pacific systems from the National Hurricane Center, with distance from Bartow</p>
       <div class="flgrid">
-        <div>
-          <h3 class="h3">Bartow right now</h3>
-          <div id="flnow"></div>
-          <div id="fldays"></div>
-          <h3 class="h3">Warnings for Bartow</h3>
-          <div id="flalerts"></div>
-        </div>
         <div>
           <h3 class="h3">Active storms</h3>
           <div id="flstorms"></div>
+        </div>
+        <div>
           <h3 class="h3">7-day outlook</h3>
           <p class="sub">Areas the National Hurricane Center is watching for development</p>
           <div id="flout"></div>
-          <div class="links">
-            <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">National Hurricane Center</a>
-            <a href="https://www.weather.gov/tbw/" target="_blank" rel="noopener">NWS Tampa Bay</a>
-            <a href="https://www.floridadisaster.org/" target="_blank" rel="noopener">Florida Division of Emergency Management</a>
-          </div>
         </div>
       </div>
+      <div class="links">
+        <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">National Hurricane Center</a>
+        <a href="https://www.weather.gov/tbw/" target="_blank" rel="noopener">NWS Tampa Bay</a>
+        <a href="https://www.floridadisaster.org/" target="_blank" rel="noopener">Florida Division of Emergency Management</a>
+      </div>
+      <details class="explain"><summary>What does this mean?</summary><div><p><b>Storm types by sustained wind:</b> tropical depression under 39 mph, tropical storm 39 to 73 mph, hurricane 74 mph and up.  Hurricanes are rated on the Saffir-Simpson scale: Category 1 is 74 to 95 mph, 2 is 96 to 110, 3 is 111 to 129, 4 is 130 to 156, and 5 is 157 and above.  Category 3 and up count as major hurricanes.</p><p><b>kt</b> means knots, the unit forecasters use.  1 knot is about 1.15 mph.  <b>mb</b> is millibars, the central pressure.  The lower it goes, the stronger the storm.  Anything within 400 miles of Bartow gets a red edge.</p><p><b>On the outlook map,</b> shaded areas are where a storm might form.  Yellow is a low chance, orange medium, and red high, over the next 7 days.</p></div></details>
     </section>
 
     <section class="panel span2">
@@ -305,7 +338,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
   </div>
 
   <footer>
-    Forecasts from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0), built on models from the Met Office, NOAA, ECMWF and other national weather services.  US warnings from the <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a>.  Tropical data from the <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">National Hurricane Center</a>.  Maps from <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy.com</a>.  Sea forecast and 1991 to 2020 history from Open-Meteo.  Places and your storm log are saved on this device only, so download the log now and then as a backup.
+    Forecasts from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0), built on models from the Met Office, NOAA, ECMWF and other national weather services.  US warnings from the <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service</a>.  Tropical data from the <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">National Hurricane Center</a>.  Maps from <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy.com</a>.  Aurora alerts from <a href="https://aurorawatch.lancs.ac.uk/" target="_blank" rel="noopener">AuroraWatch UK</a>, Lancaster University, using SAMNET and AuroraWatchNet magnetometer data.  Geomagnetic index from the NOAA Space Weather Prediction Center.  Sea forecast and 1991 to 2020 history from Open-Meteo.  Your settings and storm log are saved on this device only, so download the log now and then as a backup.
   </footer>
 </div>
 
@@ -314,11 +347,12 @@ footer{color:var(--muted);font-size:.82rem;margin-top:22px;max-width:70ch}
 (function(){
 "use strict";
 
-const STORE="wxboard.v2";
-const DEFAULTS=[
-  {name:"Barrow-in-Furness",region:"England",cc:"GB",lat:54.1108,lon:-3.2261,sea:{lat:54.08,lon:-3.40,label:"off Walney Island"}}
+const STORE="wxboard.v3";
+const PLACES=[
+  {id:"barrow",name:"Barrow-in-Furness",short:"Barrow",region:"Cumbria, England",cc:"GB",lat:54.1108,lon:-3.2261,sea:{lat:54.08,lon:-3.40,label:"off Walney Island"}},
+  {id:"bartow",name:"Bartow",short:"Bartow",region:"Central Florida",cc:"US",lat:27.8964,lon:-81.8431,sea:{lat:27.55,lon:-83.05,label:"in the Gulf off Tampa Bay"}}
 ];
-const BARTOW={name:"Bartow",region:"Florida",cc:"US",lat:27.8964,lon:-81.8431};
+const BARTOW=PLACES[1];
 const UNITS={uk:{t:"celsius",p:"mm"},us:{t:"fahrenheit",p:"inch"}};
 const MODELS=[
   {id:"ukmo_seamless",label:"Met Office"},
@@ -332,17 +366,19 @@ let lastLoad=0;
 let loadToken=0;
 
 function loadState(){
+  const s={places:PLACES,active:0,units:"us",mapArea:"place",mapLayer:"radar"};
   try{
-    const s=JSON.parse(localStorage.getItem(STORE));
-    if(s&&Array.isArray(s.places)&&s.places.length){
-      if(!UNITS[s.units]) s.units="uk";
-      if(!(s.active>=0&&s.active<s.places.length)) s.active=0;
-      return s;
+    const v=JSON.parse(localStorage.getItem(STORE));
+    if(v){
+      if(v.active===0||v.active===1) s.active=v.active;
+      if(UNITS[v.units]) s.units=v.units;
+      if(v.mapArea) s.mapArea=v.mapArea;
+      if(v.mapLayer) s.mapLayer=v.mapLayer;
     }
   }catch(e){}
-  return {places:DEFAULTS.map(p=>Object.assign({},p)),active:0,units:"uk"};
+  return s;
 }
-function saveState(){try{localStorage.setItem(STORE,JSON.stringify(state));}catch(e){}}
+function saveState(){try{localStorage.setItem(STORE,JSON.stringify({active:state.active,units:state.units,mapArea:state.mapArea,mapLayer:state.mapLayer}));}catch(e){}}
 
 const isUS=()=>state.units==="us";
 const r0=v=>(v==null||isNaN(v))?"--":Math.round(v);
@@ -406,70 +442,24 @@ function isDayAt(d,t){
   return (t>=d.daily.sunrise[i]&&t<d.daily.sunset[i])?1:0;
 }
 
-/* ---------- places ---------- */
+/* ---------- tabs ---------- */
 function renderPlaces(){
   const nav=$("places"); nav.innerHTML="";
   state.places.forEach((p,i)=>{
     const b=document.createElement("button");
-    b.type="button"; b.className="place"; b.textContent=p.name;
-    b.setAttribute("aria-pressed",i===state.active?"true":"false");
-    b.onclick=()=>{ if(state.active===i) return; state.active=i; saveState(); load(); };
+    b.type="button"; b.className="tab"; b.setAttribute("role","tab");
+    b.setAttribute("aria-selected",i===state.active?"true":"false");
+    b.textContent=p.short;
+    const sm=document.createElement("small"); sm.textContent=p.region; b.appendChild(sm);
+    b.onclick=()=>{ if(state.active===i) return; state.active=i; saveState(); load(); window.scrollTo({top:0}); };
     nav.appendChild(b);
   });
-  const e=document.createElement("button");
-  e.type="button"; e.className="place edit";
-  e.textContent=$("editor").hidden?"Edit places":"Done";
-  e.onclick=()=>{
-    $("editor").hidden=!$("editor").hidden;
-    renderPlaces(); renderMine();
-    if(!$("editor").hidden) $("q").focus();
-  };
-  nav.appendChild(e);
+  document.querySelectorAll("[data-units]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.units===state.units?"true":"false"));
 }
-function renderMine(){
-  const ul=$("mine"); ul.innerHTML="";
-  state.places.forEach((p,i)=>{
-    const li=document.createElement("li");
-    const s=document.createElement("span"); s.textContent=p.name;
-    if(p.region){const sm=document.createElement("small"); sm.textContent=" "+p.region; s.appendChild(sm);}
-    const b=document.createElement("button");
-    b.type="button"; b.className="btn"; b.textContent="Remove";
-    b.disabled=state.places.length<2;
-    b.onclick=()=>{
-      state.places.splice(i,1);
-      if(state.active>i) state.active--;
-      if(state.active>=state.places.length) state.active=state.places.length-1;
-      saveState(); renderMine(); load();
-    };
-    li.append(s,b); ul.appendChild(li);
-  });
-}
-async function doSearch(){
-  const q=$("q").value.trim(); const ul=$("results"); ul.innerHTML="";
-  if(q.length<2) return;
-  ul.innerHTML='<li class="muted">Searching</li>';
-  try{
-    const j=await getJSON("https://geocoding-api.open-meteo.com/v1/search?"+qs({name:q,count:6,language:"en",format:"json"}));
-    ul.innerHTML="";
-    const r=j.results||[];
-    if(!r.length){ul.innerHTML='<li class="muted">No matches.  Try a nearby larger town.</li>';return;}
-    r.forEach(x=>{
-      const li=document.createElement("li");
-      const s=document.createElement("span"); s.textContent=x.name;
-      const sm=document.createElement("small"); sm.textContent=" "+[x.admin1,x.country].filter(Boolean).join(", ");
-      s.appendChild(sm);
-      const b=document.createElement("button");
-      b.type="button"; b.className="btn"; b.textContent="Add";
-      b.onclick=()=>{
-        state.places.push({name:x.name,region:x.admin1||x.country||"",cc:x.country_code||"",lat:x.latitude,lon:x.longitude});
-        state.active=state.places.length-1; saveState();
-        ul.innerHTML=""; $("q").value="";
-        renderMine(); load();
-      };
-      li.append(s,b); ul.appendChild(li);
-    });
-  }catch(e){ul.innerHTML='<li class="err">Search did not load.  Check your connection and try again.</li>';}
-}
+document.querySelectorAll("[data-units]").forEach(b=>b.addEventListener("click",()=>{
+  if(state.units===b.dataset.units) return;
+  state.units=b.dataset.units; saveState(); load(); loadTracker();
+}));
 
 /* ---------- now + barometer ---------- */
 function renderNow(pl,d){
@@ -757,53 +747,20 @@ function loadOutlook(){
   img.onerror=()=>{box.innerHTML='<p class="muted">The outlook map did not load.  The National Hurricane Center link below has it.</p>';};
   box.appendChild(img);
 }
-async function loadFlorida(){
-  const now=$("flnow"), days=$("fldays");
-  now.innerHTML='<p class="muted">Loading Bartow</p>'; days.innerHTML="";
-  nwsAlerts(BARTOW,$("flalerts"),null);
-  loadStorms();
-  loadOutlook();
-  try{
-    const d=await getJSON("https://api.open-meteo.com/v1/forecast?"+qs({
-      latitude:BARTOW.lat,longitude:BARTOW.lon,timezone:"auto",past_days:1,forecast_days:3,
-      temperature_unit:"fahrenheit",wind_speed_unit:"mph",precipitation_unit:"inch",
-      current:"temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day",
-      hourly:"pressure_msl",
-      daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max"}));
-    const c=d.current, w=wx(c.weather_code,c.is_day);
-    const h=hourIndex(d), P=d.hourly.pressure_msl;
-    const delta=(h>=3&&P[h-3]!=null&&P[h]!=null)?P[h]-P[h-3]:null;
-    now.innerHTML="";
-    const t=document.createElement("p"); t.className="fltemp"; t.textContent=r0(c.temperature_2m)+"°F";
-    const cd=document.createElement("div"); cd.className="cond"; cd.textContent=(w[1]?w[1]+" ":"")+w[0];
-    const dt=document.createElement("p"); dt.className="detail";
-    dt.textContent=`Feels like ${r0(c.apparent_temperature)}°.  Humidity ${r0(c.relative_humidity_2m)}%.  Wind ${r0(c.wind_speed_10m)} mph from the ${compass(c.wind_direction_10m)}, gusting to ${r0(c.wind_gusts_10m)} mph.  Pressure ${c.pressure_msl==null?"--":(c.pressure_msl*0.02953).toFixed(2)} inHg${delta==null?"":", "+tendency(delta).toLowerCase()}.`;
-    now.append(t,cd,dt);
-    const D=d.daily; let s0=D.time.indexOf(c.time.slice(0,10)); if(s0<0) s0=0;
-    for(let i=s0;i<D.time.length&&i<s0+3;i++){
-      const dw=wx(D.weather_code[i],1);
-      const row=document.createElement("div"); row.className="day";
-      const sum=D.precipitation_sum[i];
-      row.innerHTML=`<span class="nm">${dayName(D.time[i],i-s0)}</span><span title="${dw[0]}">${dw[1]}</span><span class="hl">${r0(D.temperature_2m_max[i])}° <span>${r0(D.temperature_2m_min[i])}°</span></span><span class="meta"><span class="pp">${r0(D.precipitation_probability_max[i])}%</span> ${sum==null?"--":sum.toFixed(2)+" in"}<br>gusts ${r0(D.wind_gusts_10m_max[i])} mph</span>`;
-      days.appendChild(row);
-    }
-  }catch(e){
-    now.innerHTML='<p class="err">Bartow conditions did not load.  Tap Refresh to try again.</p>';
-  }
-}
+function loadTracker(){ loadStorms(); loadOutlook(); }
 
 /* ---------- radar and maps ---------- */
 let mapSrc="";
 function updateMap(){
   const pl=state.places[state.active];
-  const area=state.mapArea==="fl"?"fl":"place";
+  const area=state.mapArea==="tropics"?"tropics":"place";
   const layer=["radar","rain","wind","satellite"].indexOf(state.mapLayer)>=0?state.mapLayer:"radar";
   document.querySelectorAll("[data-area]").forEach(b=>{
     b.setAttribute("aria-pressed",b.dataset.area===area?"true":"false");
-    if(b.dataset.area==="place") b.textContent=pl.name;
+    if(b.dataset.area==="place") b.textContent=pl.short;
   });
   document.querySelectorAll("[data-layer]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.layer===layer?"true":"false"));
-  const c=area==="fl"?{lat:26.5,lon:-84.5,z:5}:{lat:+pl.lat,lon:+pl.lon,z:7};
+  const c=area==="tropics"?{lat:24,lon:-75,z:4}:{lat:+pl.lat,lon:+pl.lon,z:7};
   const product=layer==="radar"?"radar":(layer==="satellite"?"satellite":"ecmwf");
   const src="https://embed.windy.com/embed2.html?"+qs({
     lat:c.lat.toFixed(3),lon:c.lon.toFixed(3),detailLat:c.lat.toFixed(3),detailLon:c.lon.toFixed(3),
@@ -1052,12 +1009,85 @@ function downloadLog(){
 $("logadd").onclick=addLog;
 $("logdl").onclick=downloadLog;
 
+/* ---------- aurora ---------- */
+function kpRows(j){
+  if(!Array.isArray(j)||!j.length) return [];
+  let rows=j, head=null;
+  if(Array.isArray(j[0])){ head=j[0].map(x=>String(x).toLowerCase()); rows=j.slice(1); }
+  return rows.map(r=>{
+    let o;
+    if(Array.isArray(r)){ o={}; head.forEach((h,i)=>o[h]=r[i]); }
+    else { o={}; Object.keys(r).forEach(k=>o[k.toLowerCase()]=r[k]); }
+    const kp=Number(o.kp!=null?o.kp:(o.estimated_kp!=null?o.estimated_kp:o.kp_index));
+    return {t:String(o.time_tag||""),kp:isNaN(kp)?null:kp,obs:String(o.observed||"observed").toLowerCase()};
+  }).filter(r=>r.t&&r.kp!=null);
+}
+function kpWords(k){
+  if(k>=7) return "Strong storm.  Good odds overhead if skies are clear.";
+  if(k>=6) return "Storm level.  Worth a look north after dark.";
+  if(k>=5) return "Minor storm.  Possible glow low on the northern horizon, try a camera.";
+  if(k>=4) return "Active.  Usually camera-only from here, if anything.";
+  return "Quiet.  Unlikely from Barrow.";
+}
+async function loadAurora(pl,d,token){
+  const panel=$("aurorapanel");
+  if(pl.id!=="barrow"){ panel.hidden=true; return; }
+  panel.hidden=false;
+  const fr=$("awuk");
+  if(!fr.src) fr.src="https://aurorawatch.lancs.ac.uk/external/rolling_status_text?target=_blank";
+  const box=$("aurnow"); box.innerHTML='<p class="muted">Checking NOAA space weather</p>';
+  // tonight's cloud and darkness from the main forecast
+  let skyLine="";
+  try{
+    const D=d.daily, s=D.time.indexOf(d.current.time.slice(0,10));
+    if(s>=0&&D.sunset[s]){
+      const from=D.sunset[s], to=(D.time[s+1]||D.time[s])+"T02:00";
+      const H=d.hourly; let n=0,c=0;
+      for(let k=0;k<H.time.length;k++){ if(H.time[k]>=from&&H.time[k]<=to&&H.cloud_cover){ n++; c+=H.cloud_cover[k]||0; } }
+      if(n){ const avg=Math.round(c/n); skyLine=`Dark from about ${D.sunset[s].slice(11,16)}.  Cloud cover from then until 2am averages ${avg}%, ${avg<30?"good viewing if anything shows up":(avg<70?"some gaps to work with":"mostly clouded out")}.`; }
+    }
+  }catch(e){}
+  try{
+    const [obs,fc]=await Promise.allSettled([
+      getJSON("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"),
+      getJSON("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json")
+    ]);
+    if(token!==loadToken) return;
+    const o=obs.status==="fulfilled"?kpRows(obs.value):[];
+    const f=fc.status==="fulfilled"?kpRows(fc.value):[];
+    if(!o.length&&!f.length) throw new Error("no kp");
+    const latest=o.length?o[o.length-1]:f.filter(r=>r.obs!=="predicted").slice(-1)[0];
+    const nowIso=new Date().toISOString().replace("T"," ").slice(0,16);
+    const ahead=f.filter(r=>r.obs==="predicted"&&r.t.replace("T"," ").slice(0,16)>=nowIso.slice(0,13)).slice(0,8);
+    const peak=ahead.length?Math.max(...ahead.map(r=>r.kp)):null;
+    box.innerHTML="";
+    if(latest){
+      const big=document.createElement("div"); big.className="kpbig"; big.textContent="Kp "+latest.kp.toFixed(1).replace(/\.0$/,"");
+      const w=document.createElement("p"); w.textContent=kpWords(latest.kp);
+      box.append(big,w);
+    }
+    if(peak!=null){const p=document.createElement("p"); p.textContent=`Next 24 hours, NOAA predicts a peak around Kp ${peak.toFixed(1).replace(/\.0$/,"")}.  ${kpWords(peak)}`; box.appendChild(p);}
+    if(skyLine){const p=document.createElement("p"); p.className="muted"; p.textContent=skyLine; box.appendChild(p);}
+    if(typeof Chart!=="undefined"&&f.length){
+      const rows=f.slice(-24);
+      const labels=rows.map(r=>{const t=r.t.replace(" ","T"); const dt=new Date(t.length<=16?t+":00Z":(t.endsWith("Z")?t:t+"Z")); return isNaN(dt)?r.t.slice(11,16):dt.toLocaleString("en-GB",{weekday:"short",hour:"2-digit",minute:"2-digit"});});
+      const col=k=>k>=6?cssv("--temp"):(k>=5?cssv("--gust"):(k>=4?cssv("--wind"):cssv("--line")));
+      const o2=baseOpts(); o2.plugins.legend.display=false; o2.scales.y.min=0; o2.scales.y.max=9; o2.scales.y.ticks.stepSize=1;
+      mk("cKp",{type:"bar",data:{labels,datasets:[{label:"Kp",data:rows.map(r=>r.kp),backgroundColor:rows.map(r=>col(r.kp)),borderRadius:2}]},options:o2});
+    }
+  }catch(e){
+    if(token!==loadToken) return;
+    box.innerHTML="";
+    const p=document.createElement("p"); p.className="muted"; p.textContent="NOAA space weather data did not load here.  The AuroraWatch UK box still shows the UK alert level."; box.appendChild(p);
+    if(skyLine){const q=document.createElement("p"); q.className="muted"; q.textContent=skyLine; box.appendChild(q);}
+  }
+}
+
 /* ---------- main ---------- */
 async function load(){
   const token=++loadToken;
   const pl=state.places[state.active];
   renderPlaces();
-  $("units").textContent=isUS()?"Switch to °C":"Switch to °F";
   $("pname").textContent=pl.name;
   $("ptime").textContent="Loading";
   updateMap();
@@ -1073,28 +1103,24 @@ async function load(){
   lastSnap={place:pl.name,d:d,units:state.units};
   renderNow(pl,d); renderNowcast(d); renderHours(d); renderCharts(d); renderDays(d);
   renderLight(pl,d); renderLog();
-  renderNormal(pl,d,token); loadSea(pl,token,d);
+  renderNormal(pl,d,token); loadSea(pl,token,d); loadAurora(pl,d,token);
   $("stamp").textContent="Updated "+new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
   loadModels(pl,token); loadAlerts(pl,token);
 }
 
-$("units").onclick=()=>{state.units=isUS()?"uk":"us"; saveState(); load();};
-$("refresh").onclick=()=>{load(); loadFlorida();};
-$("go").onclick=doSearch;
-$("q").addEventListener("keydown",e=>{if(e.key==="Enter") doSearch();});
-setInterval(()=>{ if(document.visibilityState==="visible"){load(); loadFlorida();} },15*60*1000);
+$("refresh").onclick=()=>{load(); loadTracker();};
+setInterval(()=>{ if(document.visibilityState==="visible"){load(); loadTracker();} },15*60*1000);
 document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="visible"&&Date.now()-lastLoad>10*60*1000){load(); loadFlorida();}
+  if(document.visibilityState==="visible"&&Date.now()-lastLoad>10*60*1000){load(); loadTracker();}
 });
 if(window.matchMedia){
   const mq=window.matchMedia("(prefers-color-scheme: dark)");
   if(mq.addEventListener) mq.addEventListener("change",()=>load());
 }
 
-renderMine();
 renderLog();
 load();
-loadFlorida();
+loadTracker();
 })();
 </script>
 </body>
