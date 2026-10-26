@@ -719,17 +719,21 @@ async function stormsFromGIS(){
   if(j.error) throw new Error("gis error");
   const best={};
   (j.features||[]).forEach(f=>{
-    const a=f.attributes||{}; const key=(a.basin||"")+"|"+(a.stormname||"");
+    const a=f.attributes||{}; const key=String(a.basin||"").toUpperCase()+"|"+String(a.stormname||"").trim().split(/\s+/).pop().toLowerCase();
     const tau=a.tau==null?999:Number(a.tau);
     if(!best[key]||tau<best[key].tau) best[key]={tau,a};
   });
-  return Object.values(best).map(({a})=>({
-    title:((a.tcdvlp||STORM_TYPES[a.stormtype]||a.stormtype||"System")+" "+titleCase(a.stormname)).trim(),
-    basin:a.basin||"",
+  const BASINS={AL:"Atlantic",AT:"Atlantic",EP:"Eastern Pacific",CP:"Central Pacific"};
+  return Object.values(best).map(({a})=>{
+    const nm=titleCase(a.stormname), typ=a.tcdvlp||STORM_TYPES[a.stormtype]||a.stormtype||"";
+    const title=(!typ||nm.toLowerCase().indexOf(String(typ).toLowerCase())===0)?nm:(typ+" "+nm);
+    return {
+    title:(title||"System").trim(),
+    basin:BASINS[String(a.basin||"").toUpperCase()]||a.basin||"",
     lat:a.lat!=null?Number(a.lat):null, lon:a.lon!=null?Number(a.lon):null,
     kt:a.maxwind!=null?Number(a.maxwind):null, mb:a.mslp||null,
     dir:a.tcdir!=null?Number(a.tcdir):null
-  }));
+  };});
 }
 async function stormsFromJSON(){
   const j=await getJSON("https://www.nhc.noaa.gov/CurrentStorms.json");
@@ -772,13 +776,22 @@ async function loadStorms(){
     el.append(b,where,p); box.appendChild(el);
   });
 }
+let outBasin="atl";
 function loadOutlook(){
   const box=$("flout"); box.innerHTML="";
+  const seg=document.createElement("div"); seg.className="seg"; seg.style.marginBottom="8px";
+  [["atl","Atlantic"],["pac","Eastern Pacific"]].forEach(([k,lab])=>{
+    const b=document.createElement("button"); b.type="button"; b.className="segb"; b.textContent=lab;
+    b.setAttribute("aria-pressed",k===outBasin?"true":"false");
+    b.onclick=()=>{ if(outBasin===k) return; outBasin=k; loadOutlook(); };
+    seg.appendChild(b);
+  });
+  box.appendChild(seg);
   const img=document.createElement("img");
   img.className="outlook";
-  img.alt="National Hurricane Center 7-day tropical weather outlook map for the Atlantic";
-  img.src="https://www.nhc.noaa.gov/xgtwo/two_atl_7d0.png?t="+Date.now();
-  img.onerror=()=>{box.innerHTML='<p class="muted">The outlook map did not load.  The National Hurricane Center link below has it.</p>';};
+  img.alt=`National Hurricane Center 7-day tropical weather outlook map for the ${outBasin==="atl"?"Atlantic":"Eastern Pacific"}`;
+  img.src=`https://www.nhc.noaa.gov/xgtwo/two_${outBasin}_7d0.png?t=`+Date.now();
+  img.onerror=()=>{img.remove(); const p=document.createElement("p"); p.className="muted"; p.textContent="The outlook map did not load.  The National Hurricane Center link below has it."; box.appendChild(p);};
   box.appendChild(img);
 }
 function loadTracker(){ loadStorms(); loadOutlook(); }
